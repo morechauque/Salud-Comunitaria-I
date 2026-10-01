@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Riesgo Sociodemográfico - Córdoba</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f4f6f9;
+        }
+        header {
+            background: linear-gradient(135deg, #233c54, #4063a2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        p {
+            margin: 8px 0 0 0;
+            font-size: 0.95rem;
+            color: #adadad;
+            font-weight: 300;
+        }
+        #controls {
+            background-color: #ffffff;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        button {
+            border: none;
+            padding: 12px 24px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            color: white;
+        }
+        
+        #btnFiebre {
+            background-color: #ff4d4d;
+        }
+        #btnFiebre:hover {
+            background-color: #e63946;
+        }
+        #btnFiebre.active {
+            background-color: #8b0000;
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.3);
+            transform: scale(0.98);
+        }
+
+        #btnGlaucoma {
+            background-color: #00b4d8;
+        }
+        #btnGlaucoma:hover {
+            background-color: #0096c7;
+        }
+        #btnGlaucoma.active {
+            background-color: #003566;
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.3);
+            transform: scale(0.98);
+        }
+
+        #map {
+            flex-grow: 1;
+            width: 100%;
+        }
+        
+        /* Oculta los créditos por defecto de Leaflet */
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        .info-panel {
+            position: absolute;
+            bottom: 25px;
+            left: 25px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 18px;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            max-width: 340px;
+            z-index: 1000;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            backdrop-filter: blur(5px);
+        }
+        .info-panel h3 {
+            margin: 0 0 8px 0;
+            color: #1b263b;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .fuente-texto {
+            display: block;
+            margin-top: 10px;
+            font-style: italic;
+            color: #555;
+            font-size: 0.78rem;
+            border-top: 1px solid #ddd;
+            padding-top: 6px;
+        }
+        .leaflet-tooltip.label-estilo {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #333;
+            font-weight: 600;
+            font-size: 0.75rem;
+            padding: 3px 7px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Análisis de Riesgo Sociodemográfico</h1>
+        <p>Provincia de Córdoba — Comparativa Fiebre Q vs. Glaucoma</p>
+    </header>
+
+    <div id="controls">
+        <button id="btnFiebre" class="active" onclick="cambiarCapa('fiebre')">Fiebre Q (Zoonótica / Rural)</button>
+        <button id="btnGlaucoma" onclick="cambiarCapa('glaucoma')">Glaucoma (Crónica / Urbana-Etaria)</button>
+    </div>
+
+    <div id="map">
+        <div id="panelInfo" class="info-panel">
+            <h3 id="panelTitulo">Fiebre Q en Córdoba</h3>
+            <p id="panelTexto">Seleccionando zonas rurales y agropecuarias con alta exposición al ganado.</p>
+            <span id="panelFuente" class="fuente-texto"><b>Fuente:</b> Ministerio de Salud de la Nación / Boletín Epidemiológico Nacional.</span>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        var map = L.map('map').setView([-31.4201, -64.1888], 7);
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16
+        }).addTo(map);
+
+        var datosFiebreQ = [
+            // ZONAS NORTE Y NOROESTE (Clima semiárido / seco - Producción caprina, bovina y ovina)
+            { 
+                coords: [-30.72, -64.80], radio: 26000, nombre: "Cruz del Eje", 
+                desc: "Alto riesgo: Clima semiárido y ambiente seco que favorece la persistencia de Coxiella burnetii en suelo y su transmisión aerógena por polvo/aerosoles en ganadería caprina/ovina.",
+                fuente: "Fuente: Cátedra de Salud Comunitaria FCM-UNC / SENASA."
+            },
+            { 
+                coords: [-30.41, -64.50], radio: 25000, nombre: "Ischilín", 
+                desc: "Alto riesgo: Relieve seco con vientos que facilitan la dispersión de la bacteria. Exposición ocupacional en personal rural y granjas.",
+                fuente: "Fuente: Secretaría de Agricultura y Ganadería de Córdoba."
+            },
+            { 
+                coords: [-30.39, -63.70], radio: 25000, nombre: "Tulumba", 
+                desc: "Zona de producción ganadera extensiva en clima seco semiárido con baja densidad poblacional y trabajo de campo expuesto.",
+                fuente: "Fuente: INTA / Observatorio Agropecuario de Córdoba."
+            },
+            { 
+                coords: [-30.70, -62.80], radio: 26000, nombre: "Río Seco", 
+                desc: "Área de cría de ganado bovino y caprino en régimen extensivo, con población rural dispersa.",
+                fuente: "Fuente: Boletín Epidemiológico Provincial."
+            },
+            { 
+                coords: [-30.40, -64.30], radio: 26000, nombre: "Totoral", 
+                desc: "Zona de producción mixta agrícola-ganadera con predominio de explotaciones extensivas.",
+                fuente: "Fuente: Secretaría de Agricultura y Ganadería de Córdoba."
+            },
+
+            // ZONAS CENTRO-ESTE Y SUR (Cuencas lecheras, tambos, ganadería extensiva y frigoríficos)
+            { 
+                coords: [-31.10, -63.00], radio: 32000, nombre: "San Justo", 
+                desc: "Alto riesgo: Zona de intensa producción lechera y ganadera (exposición a ganado caprino/bovino y aerosoles en tambos).",
+                fuente: "Fuente: Dirección de Epidemiología de Córdoba & SENASA."
+            },
+            { 
+                coords: [-32.40, -63.20], radio: 28000, nombre: "Gral. San Martín", 
+                desc: "Riesgo moderado-alto vinculado a la presencia de tambos y procesamiento lechero en cuencas productivas.",
+                fuente: "Fuente: Ministerio de Salud de la Nación - Guía de Zoonosis."
+            },
+            { 
+                coords: [-32.80, -64.30], radio: 32000, nombre: "Río Cuarto", 
+                desc: "Área agropecuaria extensa con alta densidad de ganado bovino y factores de riesgo ocupacional rural y frigoríficos.",
+                fuente: "Fuente: INTA / Observatorio Agropecuario de Córdoba."
+            },
+            { 
+                coords: [-34.33, -64.33], radio: 27000, nombre: "General Roca", 
+                desc: "Extremo sur provincial con alta concentración de ganadería bovina extensiva e industria de faena/frigorífica.",
+                fuente: "Fuente: SENASA / Informe Epidemiológico Ganadero."
+            },
+            { 
+                coords: [-32.50, -62.30], radio: 26000, nombre: "Marcos Juárez", 
+                desc: "Cuenca agroalimentaria con importante desarrollo de industrias de faena y producción porcina/bovina.",
+                fuente: "Fuente: Colegio Médico Veterinario de Córdoba."
+            }
+        ];
+
+        var datosGlaucoma = [
+            // CENTROS URBANOS Y ÁREAS DE ALTA DENSIDAD / ENVEJECIMIENTO
+            { 
+                coords: [-31.42, -64.18], radio: 18000, nombre: "Capital", 
+                desc: "Alto predominio de casos por alta densidad poblacional urbana (>50,8 hab/km²) y mayor concentración de centros oftalmológicos.",
+                fuente: "Fuente: Consejo Argentino de Oftalmología (CAO) & INDEC."
+            },
+            { 
+                coords: [-31.20, -64.40], radio: 25000, nombre: "Punilla", 
+                desc: "Concentración significativa de población adulta mayor (índice de envejecimiento demográfico elevado).",
+                fuente: "Fuente: Dirección General de Estadística y Censos de Córdoba."
+            },
+            { 
+                coords: [-32.10, -64.40], radio: 22000, nombre: "Calamuchita", 
+                desc: "Demografía con tendencia a residentes longevos y demanda sostenida de controles médicos preventivos.",
+                fuente: "Fuente: Observatorio de Demografía y Salud Pública - UNC."
+            },
+            { 
+                coords: [-32.20, -63.50], radio: 24000, nombre: "Tercero Arriba", 
+                desc: "Población urbana consolidada con centros de mediana complejidad médica y cobertura de salud estable.",
+                fuente: "Fuente: Ministerio de Salud de la Provincia de Córdoba."
+            },
+            { 
+                coords: [-31.85, -63.80], radio: 22000, nombre: "Santa María", 
+                desc: "Crecimiento demográfico sostenido y cercanía al cordón metropolitano con demanda oftalmológica.",
+                fuente: "Fuente: Censo Nacional de Población y Vivienda."
+            },
+            { 
+                coords: [-31.86, -64.76], radio: 20000, nombre: "Traslasierra (San Alberto)", 
+                desc: "Región con asentamiento de población retirada y adulta mayor que elige la zona por calidad de vida.",
+                fuente: "Fuente: Dirección de Estadísticas Demográficas."
+            },
+
+            { 
+                coords: [-31.465, -64.160], radio: 1500, nombre: "B° Ampliación Gral. Artigas", 
+                desc: "Zona del Caso Clínico: Periferia urbana con Necesidades Básicas Insatisfechas (NBI) y barreras de acceso a controles en APS (CAPS N° 45), predisponiendo a diagnósticos tardíos.",
+                fuente: "Fuente: Caso Clínico Simulado - Salud Comunitaria I."
+            }
+        ];
+
+        var capasActuales = L.layerGroup().addTo(map);
+
+        function cargarFiebreQ() {
+            capasActuales.clearLayers();
+            datosFiebreQ.forEach(function(item) {
+                var contenidoPopup = "<b>Departamento " + item.nombre + "</b><br>" + item.desc + "<br><br><i>" + item.fuente + "</i>";
+                
+                var circulo = L.circle(item.coords, {
+                    color: '#8b0000',
+                    fillColor: '#ff4d4d',
+                    fillOpacity: 0.5,
+                    radius: item.radio
+                }).bindPopup(contenidoPopup);
+                
+                circulo.on('click', function() {
+                    map.flyTo(item.coords, 9.5, { duration: 1.2 });
+                });
+
+                circulo.bindTooltip(item.nombre, { permanent: true, direction: "center", className: "label-estilo" }).openTooltip();
+                capasActuales.addLayer(circulo);
+            });
+
+            document.getElementById('panelTitulo').innerText = "Fiebre Q (Zoonótica / Rural)";
+            document.getElementById('panelTexto').innerText = "Predomina en áreas rurales, semiáridas (Norte) y de intensa actividad ganadera/lactea (Sur y San Justo). El riesgo afecta principalmente a trabajadores rurales, peones, veterinarios y personal de frigoríficos.";
+            document.getElementById('panelFuente').innerHTML = "<b>Bibliografía/Fuente:</b> Cátedra de Salud Comunitaria I FCM-UNC & SENASA / Ministerio de Salud de la Nación.";
+
+            map.flyTo([-31.6, -63.8], 7.2, { duration: 1.5 });
+        }
+
+        function cargarGlaucoma() {
+            capasActuales.clearLayers();
+            datosGlaucoma.forEach(function(item) {
+                var contenidoPopup = "<b>" + item.nombre + "</b><br>" + item.desc + "<br><br><i>" + item.fuente + "</i>";
+
+                // Diferencia visual ligera para el barrio del caso clínico
+                var colorBorde = item.nombre.includes("Artigas") ? '#ff0055' : '#003566';
+                var colorRelleno = item.nombre.includes("Artigas") ? '#ff6699' : '#00b4d8';
+
+                var circulo = L.circle(item.coords, {
+                    color: colorBorde,
+                    fillColor: colorRelleno,
+                    fillOpacity: 0.65,
+                    radius: item.radio
+                }).bindPopup(contenidoPopup);
+                
+                circulo.on('click', function() {
+                    map.flyTo(item.coords, 10.5, { duration: 1.2 });
+                });
+
+                circulo.bindTooltip(item.nombre, { permanent: true, direction: "center", className: "label-estilo" }).openTooltip();
+                capasActuales.addLayer(circulo);
+            });
+
+            document.getElementById('panelTitulo').innerText = "Glaucoma (Crónica / Urbana-Etaria)";
+            document.getElementById('panelTexto').innerText = "Predomina en centros urbanos con alta densidad poblacional y regiones con elevado índice de envejecimiento demográfico (>60 años). En la periferia urbana se suman barreras de acceso a controles oftalmológicos preventivos.";
+            document.getElementById('panelFuente').innerHTML = "<b>Bibliografía/Fuente:</b> Consejo Argentino de Oftalmología (CAO) & Censo Nacional INDEC / FCM-UNC.";
+
+            map.flyTo([-31.7, -64.2], 7.8, { duration: 1.5 });
+        }
+
+        function cambiarCapa(tipo) {
+            var btnFiebre = document.getElementById('btnFiebre');
+            var btnGlaucoma = document.getElementById('btnGlaucoma');
+
+            if (tipo === 'fiebre') {
+                cargarFiebreQ();
+                btnFiebre.classList.add('active');
+                btnGlaucoma.classList.remove('active');
+            } else {
+                cargarGlaucoma();
+                btnGlaucoma.classList.add('active');
+                btnFiebre.classList.remove('active');
+            }
+        }
+
+        cargarFiebreQ();
+    </script>
+</body>
+</html>
